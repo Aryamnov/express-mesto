@@ -1,0 +1,33 @@
+{
+  "name": "express-mesto",
+  "version": "1.0.0",
+  "description": "`/routes` — папка с файлами роутера  \r `/controllers` — папка с файлами контроллеров пользователя и карточки   \r `/models` — папка с файлами описания схем пользователя и карточки",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodem app.js",
+    "dev": "nodemon app.js",
+    "lint": "npx eslint . --ignore-pattern 'node_modules/' --ignore-pattern 'public/'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yandex-praktikum/express-mesto.git"
+  },
+  "author": "Andrey Aryamnov",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/yandex-praktikum/express-mesto/issues"
+  },
+  "homepage": "https://github.com/yandex-praktikum/express-mesto#readme",
+  "devDependencies": {
+    "eslint": "^7.30.0",
+    "eslint-config-airbnb-base": "^14.2.1",
+    "eslint-plugin-import": "^2.23.4",
+    "nodemon": "^2.0.12"
+  },
+  "dependencies": {
+    "express": "^4.17.1",
+    "mongodb": "^3.6.10",
+    "mongoose": "^5.13.2"
+  }
+}
