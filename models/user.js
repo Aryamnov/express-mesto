@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-// Опишем схему:
+
 const userSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -17,6 +17,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  __v: { type: Number, select: false },
 });
 
 // создаём модель и экспортируем её
