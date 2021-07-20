@@ -41,6 +41,7 @@ const deleteCards = (req, res) => {
     })
     .catch((err) => {
       if (err === 'Карточка не найдена') res.status(ERROR_CODE_NOT_FOUND).send({ message: err });
+      if (err._message === undefined) return res.status(ERROR_CODE_BAD_REQUEST).send({ message: 'Невалидный id' });
       res.status(ERROR_CODE_SERVER_ERROR).send({ message: 'Произошла ошибка' });
     });
 };
