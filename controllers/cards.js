@@ -28,6 +28,7 @@ const createCard = (req, res) => {
   Card.create({ name, link, owner })
     .then((card) => res.status(201).send({ data: card }))
     .catch((err) => {
+      // eslint-disable-next-line no-underscore-dangle
       if (err._message === 'card validation failed') return res.status(ERROR_CODE_BAD_REQUEST).send({ message: 'Переданы некорректные данные' });
       res.status(ERROR_CODE_SERVER_ERROR).send({ message: 'Произошла ошибка' });
     });
@@ -35,12 +36,11 @@ const createCard = (req, res) => {
 
 const deleteCards = (req, res) => {
   Card.findByIdAndRemove(req.params.cardId)
-    .then((card) => {
-      if (card === null) return Promise.reject('Карточка не найдена');
-      res.send({ data: card });
-    })
+    .orFail(new Error('Карточка не найдена'))
+    .then((card) => res.send({ data: card }))
     .catch((err) => {
-      if (err === 'Карточка не найдена') res.status(ERROR_CODE_NOT_FOUND).send({ message: err });
+      if (err.message === 'Карточка не найдена') res.status(ERROR_CODE_NOT_FOUND).send({ message: err.message });
+      // eslint-disable-next-line no-underscore-dangle
       if (err._message === undefined) return res.status(ERROR_CODE_BAD_REQUEST).send({ message: 'Невалидный id' });
       res.status(ERROR_CODE_SERVER_ERROR).send({ message: 'Произошла ошибка' });
     });
@@ -52,12 +52,11 @@ const likeCard = (req, res) => {
     { $addToSet: { likes: req.user._id } }, // добавить _id в массив, если его там нет
     { new: true },
   )
-    .then((card) => {
-      if (card === null) return Promise.reject('Карточка не найдена');
-      res.send({ data: card });
-    })
+    .orFail(new Error('Карточка не найдена'))
+    .then((card) => res.send({ data: card }))
     .catch((err) => {
-      if (err === 'Карточка не найдена' || err.messageFormat === undefined) res.status(404).send({ message: 'Карточка не найдена' });
+      if (err.name === 'CastError') res.status(ERROR_CODE_BAD_REQUEST).send({ message: 'Введены некорректные данные' });
+      if (err.message === 'Карточка не найдена') res.status(ERROR_CODE_NOT_FOUND).send({ message: 'Карточка не найдена' });
       res.status(ERROR_CODE_SERVER_ERROR).send({ message: 'Произошла ошибка' });
     });
 };
@@ -68,12 +67,11 @@ const dislikeCard = (req, res) => {
     { $pull: { likes: req.user._id } }, // убрать _id из массива
     { new: true },
   )
-    .then((card) => {
-      if (card === null) return Promise.reject('Карточка не найдена');
-      res.send({ data: card });
-    })
+    .orFail(new Error('Карточка не найдена'))
+    .then((card) => res.send({ data: card }))
     .catch((err) => {
-      if (err === 'Карточка не найдена' || err.messageFormat === undefined) res.status(404).send({ message: 'Карточка не найдена' });
+      if (err.name === 'CastError') res.status(ERROR_CODE_BAD_REQUEST).send({ message: 'Введены некорректные данные' });
+      if (err.message === 'Карточка не найдена') res.status(ERROR_CODE_NOT_FOUND).send({ message: 'Карточка не найдена' });
       res.status(ERROR_CODE_SERVER_ERROR).send({ message: 'Произошла ошибка' });
     });
 };
