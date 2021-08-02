@@ -1,4 +1,6 @@
 /* eslint-disable consistent-return */
+const bcrypt = require('bcryptjs');
+const validator = require('validator');
 const User = require('../models/user');
 
 const ERROR_CODE_BAD_REQUEST = 400;
@@ -26,9 +28,21 @@ const getUserId = (req, res) => {
 };
 
 const newUser = (req, res) => {
-  const { name, about, avatar } = req.body;
+  const {
+    name, about, avatar, email, password,
+  } = req.body;
 
-  User.create({ name, about, avatar })
+  if (!validator.isEmail(email)) return res.status(ERROR_CODE_BAD_REQUEST).send({ message: 'Переданы некорректные данные' });
+
+  User.findOne({ email })
+    .then(user => {
+      if (user !== null) return res.status(409).send({ message: 'Такой пользователь уже существует' });
+    });
+
+  bcrypt.hash(password, 10)
+    .then((hash) => User.create({
+      name, about, avatar, email, password: hash,
+    }))
     .then((user) => res.status(201).send({ data: user }))
     .catch((err) => {
       // eslint-disable-next-line no-underscore-dangle
