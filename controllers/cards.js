@@ -5,18 +5,20 @@ const Card = require('../models/card');
 // eslint-disable-next-line import/order
 const ObjectId = require('mongodb').ObjectID;
 
+const NotFoundError = require('../errors/not-found-err');
+
 const ERROR_CODE_BAD_REQUEST = 400;
 const ERROR_CODE_NOT_FOUND = 404;
 const ERROR_CODE_SERVER_ERROR = 500;
 
-const getCards = (req, res) => {
+const getCards = (req, res, next) => {
   Card.find({})
     .then((card) => {
-      if (card.length === 0) return Promise.reject('Карточек нет');
+      if (card.length === 0) throw new NotFoundError('Карточек нет');
       res.send({ data: card });
     })
     .catch((err) => {
-      if (err === 'Карточек нет') res.status(ERROR_CODE_NOT_FOUND).send({ message: err });
+      if (err.message === 'Карточек нет') next(new NotFoundError('Карточек нет'));
       res.status(ERROR_CODE_SERVER_ERROR).send({ message: 'Произошла ошибка' });
     });
 };
@@ -34,12 +36,18 @@ const createCard = (req, res) => {
     });
 };
 
-const deleteCards = (req, res) => {
-  Card.findByIdAndRemove(req.params.cardId)
-    .orFail(new Error('Карточка не найдена'))
-    .then((card) => res.send({ data: card }))
+const deleteCards = (req, res, next) => {
+  Card.findById(req.params.cardId)
+    .orFail(() => {
+      throw new NotFoundError('Карточка не найдена');
+    })
+    .then((card) => {
+      if (!card.owner.equals(req.user._id)) return res.status(ERROR_CODE_BAD_REQUEST).send({ message: 'Нельзя удалить чужую карточку' });
+      Card.findByIdAndRemove(req.params.cardId)
+        .then((card) => res.send({ data: card }));
+    })
     .catch((err) => {
-      if (err.message === 'Карточка не найдена') res.status(ERROR_CODE_NOT_FOUND).send({ message: err.message });
+      if (err.message === 'Карточка не найдена') next(new NotFoundError('Карточка не найдена'));
       // eslint-disable-next-line no-underscore-dangle
       if (err._message === undefined) return res.status(ERROR_CODE_BAD_REQUEST).send({ message: 'Невалидный id' });
       res.status(ERROR_CODE_SERVER_ERROR).send({ message: 'Произошла ошибка' });
