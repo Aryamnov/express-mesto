@@ -29,10 +29,10 @@ const login = (req, res, next) => {
         .then((user) => res.send({ token: jwt.sign({ _id: user._id }, 'secret-key-dev', { expiresIn: '7d' }) }))
         .catch(() => next(new ServerError('Произошла ошибка')));
     })
-    .catch((err) => { next(new UnauthorizedError('Неправильные почта или пароль')); });
+    .catch(() => { next(new UnauthorizedError('Неправильные почта или пароль')); });
 };
 
-const getUsers = (req, res) => {
+const getUsers = (req, res, next) => {
   User.find({})
     .then((user) => res.send({ data: user }))
     .catch(() => next(new ServerError('Произошла ошибка')));
@@ -54,9 +54,8 @@ const getUserId = (req, res, next) => {
     });
 };
 
-const getMeInfo = (req, res) => {
+const getMeInfo = (req, res, next) => {
   const { _id } = req.user;
-  console.log(_id);
   User.findOne({ _id })
     .then((user) => {
       if (user) res.send({ data: user });
@@ -71,31 +70,22 @@ const newUser = (req, res, next) => {
 
   if (!validator.isEmail(email)) throw new BadRequestError('Переданы некорректные данные');
 
-  /*User.findOne({ email })
-    .then((user) => {
-      throw new RegistrationError('Такой пользователь уже существует');
-    })
-    .catch((err) => {
-      if (err.message === 'Такой пользователь уже существует') next(new RegistrationError('Такой пользователь уже существует'));
-      next(new ServerError('Произошла ошибка'));
-    });*/
-
   bcrypt.hash(password, 10)
     .then((hash) => User.create({
       name, about, avatar, email, password: hash,
     }))
     .then((user) => res.status(201).send({ data: user }))
     .catch((err) => {
-      if (err.name === "MongoError" && err.code === 11000) {
+      if (err.name === 'MongoError' && err.code === 11000) {
         next(new RegistrationError('Такой пользователь уже существует'));
-      } 
+      }
       // eslint-disable-next-line no-underscore-dangle
       if (err._message === 'user validation failed') next(new BadRequestError('Переданы некорректные данные'));
       next(new ServerError('Произошла ошибка'));
     });
 };
 
-const patchUser = (req, res) => {
+const patchUser = (req, res, next) => {
   const { name, about } = req.body;
 
   User.findByIdAndUpdate(req.user._id, { name, about },
@@ -108,7 +98,7 @@ const patchUser = (req, res) => {
     });
 };
 
-const patchAvatar = (req, res) => {
+const patchAvatar = (req, res, next) => {
   const { avatar } = req.body;
 
   User.findByIdAndUpdate(req.user._id, { avatar },

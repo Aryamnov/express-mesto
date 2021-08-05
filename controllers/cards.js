@@ -43,6 +43,7 @@ const deleteCards = (req, res, next) => {
     .then((card) => {
       if (!card.owner.equals(req.user._id)) throw new ForbiddenError('Нельзя удалить чужую карточку');
       Card.findByIdAndRemove(req.params.cardId)
+        // eslint-disable-next-line no-shadow
         .then((card) => res.send({ data: card }));
     })
     .catch((err) => {
