@@ -5,18 +5,17 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/user');
 const NotFoundError = require('../errors/not-found-err');
 const BadRequestError = require('../errors/bad-request-err');
+const ServerError = require('../errors/server-err');
+const UnauthorizedError = require('../errors/unauthorized-err');
+const RegistrationError = require('../errors/registration-err');
 
-const ERROR_CODE_BAD_REQUEST = 400;
-const ERROR_CODE_NOT_FOUND = 404;
-const ERROR_CODE_SERVER_ERROR = 500;
-
-const login = (req, res) => {
+const login = (req, res, next) => {
   const { email, password } = req.body;
 
   User.findOne({ email }).select('+password')
     .then((user) => {
       if (!user) {
-        return Promise.reject(new Error('Неправильные почта или пароль'));
+        throw new UnauthorizedError('Неправильные почта или пароль');
       }
 
       return bcrypt.compare(password, user.password);
@@ -24,23 +23,19 @@ const login = (req, res) => {
     .then((matched) => {
       if (!matched) {
         // хеши не совпали — отклоняем промис
-        return Promise.reject(new Error('Неправильные почта или пароль'));
+        throw new UnauthorizedError('Неправильные почта или пароль');
       }
       User.findOne({ email })
         .then((user) => res.send({ token: jwt.sign({ _id: user._id }, 'secret-key-dev', { expiresIn: '7d' }) }))
-        .catch(() => res.status(ERROR_CODE_SERVER_ERROR).send({ message: 'Произошла ошибка' }));
+        .catch(() => next(new ServerError('Произошла ошибка')));
     })
-    .catch((err) => {
-      res
-        .status(401)
-        .send({ message: err.message });
-    });
+    .catch((err) => { next(new UnauthorizedError('Неправильные почта или пароль')); });
 };
 
 const getUsers = (req, res) => {
   User.find({})
     .then((user) => res.send({ data: user }))
-    .catch(() => res.status(ERROR_CODE_SERVER_ERROR).send({ message: 'Произошла ошибка' }));
+    .catch(() => next(new ServerError('Произошла ошибка')));
 };
 
 const getUserId = (req, res, next) => {
@@ -53,9 +48,9 @@ const getUserId = (req, res, next) => {
       res.send({ data: user });
     })
     .catch((err) => {
-      if (err.name === 'CastError') res.status(ERROR_CODE_BAD_REQUEST).send({ message: 'Введены некорректные данные' });
+      if (err.name === 'CastError') next(new BadRequestError('Переданы некорректные данные'));
       if (err.message === 'Пользователь не найден') next(new NotFoundError('Пользователь не найден'));
-      res.status(ERROR_CODE_SERVER_ERROR).send({ message: 'Произошла ошибка', err });
+      next(new ServerError('Произошла ошибка'));
     });
 };
 
@@ -66,21 +61,24 @@ const getMeInfo = (req, res) => {
     .then((user) => {
       if (user) res.send({ data: user });
     })
-    .catch(() => res.status(ERROR_CODE_SERVER_ERROR).send({ message: 'Произошла ошибка' }));
+    .catch(() => next(new ServerError('Произошла ошибка')));
 };
 
-const newUser = (req, res) => {
+const newUser = (req, res, next) => {
   const {
     name, about, avatar, email, password,
   } = req.body;
 
-  if (!validator.isEmail(email)) return res.status(ERROR_CODE_BAD_REQUEST).send({ message: 'Переданы некорректные данные' });
+  if (!validator.isEmail(email)) throw new BadRequestError('Переданы некорректные данные');
 
-  User.findOne({ email })
+  /*User.findOne({ email })
     .then((user) => {
-      if (user) return res.status(409).send({ message: 'Такой пользователь уже существует' });
+      throw new RegistrationError('Такой пользователь уже существует');
     })
-    .catch(() => res.status(ERROR_CODE_SERVER_ERROR).send({ message: 'Произошла ошибка' }));
+    .catch((err) => {
+      if (err.message === 'Такой пользователь уже существует') next(new RegistrationError('Такой пользователь уже существует'));
+      next(new ServerError('Произошла ошибка'));
+    });*/
 
   bcrypt.hash(password, 10)
     .then((hash) => User.create({
@@ -88,9 +86,12 @@ const newUser = (req, res) => {
     }))
     .then((user) => res.status(201).send({ data: user }))
     .catch((err) => {
+      if (err.name === "MongoError" && err.code === 11000) {
+        next(new RegistrationError('Такой пользователь уже существует'));
+      } 
       // eslint-disable-next-line no-underscore-dangle
-      if (err._message === 'user validation failed') return res.status(ERROR_CODE_BAD_REQUEST).send({ message: 'Переданы некорректные данные' });
-      res.status(ERROR_CODE_SERVER_ERROR).send({ message: 'Произошла ошибка' });
+      if (err._message === 'user validation failed') next(new BadRequestError('Переданы некорректные данные'));
+      next(new ServerError('Произошла ошибка'));
     });
 };
 
@@ -102,8 +103,8 @@ const patchUser = (req, res) => {
     .then((user) => res.send({ data: user }))
     .catch((err) => {
       // eslint-disable-next-line no-underscore-dangle
-      if (err._message === 'Validation failed') return res.status(ERROR_CODE_BAD_REQUEST).send({ message: 'Переданы некорректные данные' });
-      res.status(ERROR_CODE_SERVER_ERROR).send({ message: 'Произошла ошибка' });
+      if (err._message === 'Validation failed') throw new BadRequestError('Переданы некорректные данные');
+      next(new ServerError('Произошла ошибка'));
     });
 };
 
@@ -115,8 +116,8 @@ const patchAvatar = (req, res) => {
     .then((user) => res.send({ data: user }))
     .catch((err) => {
       // eslint-disable-next-line no-underscore-dangle
-      if (err._message === 'Validation failed') return res.status(ERROR_CODE_BAD_REQUEST).send({ message: 'Переданы некорректные данные' });
-      res.status(ERROR_CODE_SERVER_ERROR).send({ message: 'Произошла ошибка' });
+      if (err._message === 'Validation failed') next(new BadRequestError('Переданы некорректные данные'));
+      next(new ServerError('Произошла ошибка'));
     });
 };
 

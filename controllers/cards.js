@@ -6,10 +6,9 @@ const Card = require('../models/card');
 const ObjectId = require('mongodb').ObjectID;
 
 const NotFoundError = require('../errors/not-found-err');
-
-const ERROR_CODE_BAD_REQUEST = 400;
-const ERROR_CODE_NOT_FOUND = 404;
-const ERROR_CODE_SERVER_ERROR = 500;
+const BadRequestError = require('../errors/bad-request-err');
+const ServerError = require('../errors/server-err');
+const ForbiddenError = require('../errors/forbidden-err');
 
 const getCards = (req, res, next) => {
   Card.find({})
@@ -19,11 +18,11 @@ const getCards = (req, res, next) => {
     })
     .catch((err) => {
       if (err.message === 'Карточек нет') next(new NotFoundError('Карточек нет'));
-      res.status(ERROR_CODE_SERVER_ERROR).send({ message: 'Произошла ошибка' });
+      next(new ServerError('Произошла ошибка'));
     });
 };
 
-const createCard = (req, res) => {
+const createCard = (req, res, next) => {
   const { name, link } = req.body;
   const owner = ObjectId(req.user._id);
 
@@ -31,8 +30,8 @@ const createCard = (req, res) => {
     .then((card) => res.status(201).send({ data: card }))
     .catch((err) => {
       // eslint-disable-next-line no-underscore-dangle
-      if (err._message === 'card validation failed') return res.status(ERROR_CODE_BAD_REQUEST).send({ message: 'Переданы некорректные данные' });
-      res.status(ERROR_CODE_SERVER_ERROR).send({ message: 'Произошла ошибка' });
+      if (err._message === 'card validation failed') next(new BadRequestError('Переданы некорректные данные'));
+      next(new ServerError('Произошла ошибка'));
     });
 };
 
@@ -42,45 +41,50 @@ const deleteCards = (req, res, next) => {
       throw new NotFoundError('Карточка не найдена');
     })
     .then((card) => {
-      if (!card.owner.equals(req.user._id)) return res.status(ERROR_CODE_BAD_REQUEST).send({ message: 'Нельзя удалить чужую карточку' });
+      if (!card.owner.equals(req.user._id)) throw new ForbiddenError('Нельзя удалить чужую карточку');
       Card.findByIdAndRemove(req.params.cardId)
         .then((card) => res.send({ data: card }));
     })
     .catch((err) => {
+      if (err.message === 'Нельзя удалить чужую карточку') next(new ForbiddenError('Нельзя удалить чужую карточку'));
       if (err.message === 'Карточка не найдена') next(new NotFoundError('Карточка не найдена'));
       // eslint-disable-next-line no-underscore-dangle
-      if (err._message === undefined) return res.status(ERROR_CODE_BAD_REQUEST).send({ message: 'Невалидный id' });
-      res.status(ERROR_CODE_SERVER_ERROR).send({ message: 'Произошла ошибка' });
+      if (err._message === undefined) next(new BadRequestError('Невалидный id'));
+      next(new ServerError('Произошла ошибка'));
     });
 };
 
-const likeCard = (req, res) => {
+const likeCard = (req, res, next) => {
   Card.findByIdAndUpdate(
     req.params.cardId,
     { $addToSet: { likes: req.user._id } }, // добавить _id в массив, если его там нет
     { new: true },
   )
-    .orFail(new Error('Карточка не найдена'))
+    .orFail(() => {
+      throw new NotFoundError('Карточка не найдена');
+    })
     .then((card) => res.send({ data: card }))
     .catch((err) => {
-      if (err.name === 'CastError') res.status(ERROR_CODE_BAD_REQUEST).send({ message: 'Введены некорректные данные' });
-      if (err.message === 'Карточка не найдена') res.status(ERROR_CODE_NOT_FOUND).send({ message: 'Карточка не найдена' });
-      res.status(ERROR_CODE_SERVER_ERROR).send({ message: 'Произошла ошибка' });
+      if (err.name === 'CastError') next(new BadRequestError('Переданы некорректные данные'));
+      if (err.message === 'Карточка не найдена') next(new NotFoundError('Карточка не найдена'));
+      next(new ServerError('Произошла ошибка'));
     });
 };
 
-const dislikeCard = (req, res) => {
+const dislikeCard = (req, res, next) => {
   Card.findByIdAndUpdate(
     req.params.cardId,
     { $pull: { likes: req.user._id } }, // убрать _id из массива
     { new: true },
   )
-    .orFail(new Error('Карточка не найдена'))
+    .orFail(() => {
+      throw new NotFoundError('Карточка не найдена');
+    })
     .then((card) => res.send({ data: card }))
     .catch((err) => {
-      if (err.name === 'CastError') res.status(ERROR_CODE_BAD_REQUEST).send({ message: 'Введены некорректные данные' });
-      if (err.message === 'Карточка не найдена') res.status(ERROR_CODE_NOT_FOUND).send({ message: 'Карточка не найдена' });
-      res.status(ERROR_CODE_SERVER_ERROR).send({ message: 'Произошла ошибка' });
+      if (err.name === 'CastError') next(new BadRequestError('Переданы некорректные данные'));
+      if (err.message === 'Карточка не найдена') next(new NotFoundError('Карточка не найдена'));
+      next(new ServerError('Произошла ошибка'));
     });
 };
 module.exports = {
