@@ -9,6 +9,8 @@ const ServerError = require('../errors/server-err');
 const UnauthorizedError = require('../errors/unauthorized-err');
 const RegistrationError = require('../errors/registration-err');
 
+const { JWT_SECRET = 'secret-key-dev' } = process.env;
+
 const login = (req, res, next) => {
   const { email, password } = req.body;
 
@@ -26,7 +28,7 @@ const login = (req, res, next) => {
         throw new UnauthorizedError('Неправильные почта или пароль');
       }
       User.findOne({ email })
-        .then((user) => res.send({ token: jwt.sign({ _id: user._id }, 'secret-key-dev', { expiresIn: '7d' }) }))
+        .then((user) => res.send({ token: jwt.sign({ _id: user._id }, JWT_SECRET, { expiresIn: '7d' }) }))
         .catch(() => next(new ServerError('Произошла ошибка')));
     })
     .catch(() => { next(new UnauthorizedError('Неправильные почта или пароль')); });
@@ -74,7 +76,12 @@ const newUser = (req, res, next) => {
     .then((hash) => User.create({
       name, about, avatar, email, password: hash,
     }))
-    .then((user) => res.status(201).send({ data: user }))
+    .then((user) => {
+      const { _id } = user;
+      User.find({ _id })
+        // eslint-disable-next-line no-shadow
+        .then((user) => res.status(201).send({ data: user }));
+    })
     .catch((err) => {
       if (err.name === 'MongoError' && err.code === 11000) {
         next(new RegistrationError('Такой пользователь уже существует'));
